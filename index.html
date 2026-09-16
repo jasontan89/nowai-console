@@ -1,0 +1,969 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>NowAI ServiceDesk Console</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg-color: var(--tg-theme-bg-color, #0b1329);
+      --card-bg: var(--tg-theme-secondary-bg-color, #131f3f);
+      --text-color: var(--tg-theme-text-color, #f1f5f9);
+      --hint-color: var(--tg-theme-hint-color, #94a3b8);
+      --link-color: var(--tg-theme-link-color, #38bdf8);
+      --button-color: var(--tg-theme-button-color, #3b82f6);
+      --button-text-color: var(--tg-theme-button-text-color, #ffffff);
+    }
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      background-color: var(--bg-color);
+      color: var(--text-color);
+      min-height: 100vh;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .font-mono {
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .drawer {
+      transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    ::-webkit-scrollbar {
+      width: 4px;
+      height: 4px;
+    }
+    ::-webkit-scrollbar-track {
+      background: rgba(0,0,0,0.1);
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(255,255,255,0.15);
+      border-radius: 9999px;
+    }
+    .pulse-green {
+      animation: pulseGreen 2s infinite;
+    }
+    @keyframes pulseGreen {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.5; transform: scale(1.15); }
+    }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 flex flex-col min-h-screen pb-16 antialiased selection:bg-blue-600 selection:text-white">
+
+  <!-- Top Sticky Header -->
+  <header class="sticky top-0 z-30 bg-slate-900/90 backdrop-blur-md border-b border-slate-800/80 px-4 py-3 shadow-lg">
+    <div class="max-w-4xl mx-auto flex items-center justify-between gap-3">
+      <div class="flex items-center gap-2.5">
+        <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-500 flex items-center justify-center shadow-lg shadow-blue-500/20 text-white font-black text-lg">
+          ⚡
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <h1 class="text-base font-bold tracking-tight text-white">ServiceNow Desk</h1>
+            <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+              <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 pulse-green"></span> PDI dev312295
+            </span>
+          </div>
+          <p id="userGreeting" class="text-xs text-slate-400 flex items-center gap-1.5">
+            <span>👤</span> <span id="userName">IT Specialist</span>
+          </p>
+        </div>
+      </div>
+      <div class="flex items-center gap-2">
+        <button onclick="fetchIncidents()" id="btnRefresh" title="Refresh" class="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700/60 transition active:scale-95">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+        </button>
+        <button onclick="openCreateModal()" class="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shadow-md shadow-blue-600/30 transition active:scale-95">
+          <span>➕</span>
+          <span>New</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="max-w-4xl mx-auto w-full px-4 pt-4 flex-1 flex flex-col gap-4">
+
+    <!-- KPI Metric Cards Grid -->
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+      <div onclick="setFilter('critical')" class="cursor-pointer p-3 rounded-xl bg-slate-900/60 border border-red-500/20 hover:border-red-500/40 transition active:scale-[0.98]">
+        <div class="flex items-center justify-between text-xs text-slate-400">
+          <span>🚨 Critical P1/P2</span>
+          <span class="text-xs text-red-400">High</span>
+        </div>
+        <div id="kpiCritical" class="text-2xl font-black text-red-400 font-mono mt-1">-</div>
+      </div>
+
+      <div onclick="setFilter('triage')" class="cursor-pointer p-3 rounded-xl bg-slate-900/60 border border-amber-500/20 hover:border-amber-500/40 transition active:scale-[0.98]">
+        <div class="flex items-center justify-between text-xs text-slate-400">
+          <span>📋 Triage Queue</span>
+          <span class="text-xs text-amber-400">Open</span>
+        </div>
+        <div id="kpiTriage" class="text-2xl font-black text-amber-400 font-mono mt-1">-</div>
+      </div>
+
+      <div onclick="setFilter('my')" class="cursor-pointer p-3 rounded-xl bg-slate-900/60 border border-blue-500/20 hover:border-blue-500/40 transition active:scale-[0.98]">
+        <div class="flex items-center justify-between text-xs text-slate-400">
+          <span>💼 My Tickets</span>
+          <span class="text-xs text-blue-400">Assigned</span>
+        </div>
+        <div id="kpiMy" class="text-2xl font-black text-blue-400 font-mono mt-1">-</div>
+      </div>
+
+      <div onclick="setFilter('all')" class="cursor-pointer p-3 rounded-xl bg-slate-900/60 border border-slate-700/50 hover:border-slate-600 transition active:scale-[0.98]">
+        <div class="flex items-center justify-between text-xs text-slate-400">
+          <span>🌐 All Active</span>
+          <span class="text-xs text-slate-400">Total</span>
+        </div>
+        <div id="kpiTotal" class="text-2xl font-black text-slate-200 font-mono mt-1">-</div>
+      </div>
+    </div>
+
+    <!-- Search Bar -->
+    <div class="relative flex items-center">
+      <span class="absolute left-3 text-slate-400 pointer-events-none">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+      </span>
+      <input
+        type="text"
+        id="searchInput"
+        oninput="handleSearch()"
+        placeholder="Filter by INC#, short description, or caller..."
+        class="w-full pl-9 pr-9 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-blue-500/70 transition shadow-inner"
+      />
+      <button id="clearSearchBtn" onclick="clearSearch()" class="hidden absolute right-3 text-slate-500 hover:text-slate-300">
+        ✕
+      </button>
+    </div>
+
+    <!-- Tabs Bar -->
+    <div class="flex items-center gap-1.5 p-1 bg-slate-900/90 border border-slate-800 rounded-xl overflow-x-auto text-xs font-semibold no-scrollbar">
+      <button onclick="setFilter('triage')" id="tab-triage" class="tab-btn flex-1 py-1.5 px-3 rounded-lg bg-blue-600 text-white shadow-md transition text-center whitespace-nowrap">
+        📋 Triage
+      </button>
+      <button onclick="setFilter('my')" id="tab-my" class="tab-btn flex-1 py-1.5 px-3 rounded-lg text-slate-400 hover:text-slate-200 transition text-center whitespace-nowrap">
+        💼 Assigned to Me
+      </button>
+      <button onclick="setFilter('critical')" id="tab-critical" class="tab-btn flex-1 py-1.5 px-3 rounded-lg text-slate-400 hover:text-slate-200 transition text-center whitespace-nowrap">
+        🚨 Critical P1/P2
+      </button>
+      <button onclick="setFilter('all')" id="tab-all" class="tab-btn flex-1 py-1.5 px-3 rounded-lg text-slate-400 hover:text-slate-200 transition text-center whitespace-nowrap">
+        🌐 All Active
+      </button>
+    </div>
+
+    <!-- Incident List Container -->
+    <div id="incidentListContainer" class="flex flex-col gap-2.5 pb-8">
+      <div id="loadingState" class="py-12 flex flex-col items-center justify-center gap-3 text-slate-400">
+        <div class="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+        <p class="text-xs font-medium">Connecting to ServiceNow...</p>
+      </div>
+    </div>
+  </main>
+
+  <!-- Slide-Over Drawer: Incident Details -->
+  <div id="drawerBackdrop" onclick="closeDrawer()" class="hidden fixed inset-0 z-40 bg-slate-950/70 backdrop-blur-sm transition-opacity"></div>
+  <aside id="incidentDrawer" class="drawer fixed inset-y-0 right-0 z-50 w-full sm:max-w-md bg-slate-900 border-l border-slate-800 shadow-2xl flex flex-col transform translate-x-full">
+    <div class="px-4 py-3.5 border-b border-slate-800 flex items-center justify-between bg-slate-900/90 backdrop-blur">
+      <div class="flex items-center gap-2">
+        <span id="drawerIncNumber" class="font-mono font-bold text-base text-white">INC0000000</span>
+        <span id="drawerPriorityBadge"></span>
+        <span id="drawerStateBadge"></span>
+      </div>
+      <button onclick="closeDrawer()" class="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition">
+        ✕
+      </button>
+    </div>
+
+    <div class="p-4 flex-1 overflow-y-auto flex flex-col gap-4 text-xs">
+      <div>
+        <h3 class="text-slate-400 font-medium mb-1">Short Description</h3>
+        <p id="drawerShortDesc" class="text-sm font-semibold text-slate-100 leading-snug"></p>
+      </div>
+
+      <div id="drawerDescContainer" class="p-3 bg-slate-950/50 rounded-xl border border-slate-800/80">
+        <h3 class="text-slate-400 font-medium mb-1">Description</h3>
+        <p id="drawerDescription" class="text-slate-300 whitespace-pre-wrap leading-relaxed">No description provided.</p>
+      </div>
+
+      <div class="grid grid-cols-2 gap-2.5 p-3 bg-slate-950/40 rounded-xl border border-slate-800/60">
+        <div>
+          <span class="text-slate-500">Caller</span>
+          <p id="drawerCaller" class="font-medium text-slate-200 mt-0.5">-</p>
+        </div>
+        <div>
+          <span class="text-slate-500">Category</span>
+          <p id="drawerCategory" class="font-medium text-slate-200 mt-0.5">-</p>
+        </div>
+        <div>
+          <span class="text-slate-500">Assignment Group</span>
+          <p id="drawerGroup" class="font-medium text-slate-200 mt-0.5">-</p>
+        </div>
+        <div>
+          <span class="text-slate-500">Assigned To</span>
+          <p id="drawerAssignee" class="font-medium text-slate-200 mt-0.5">-</p>
+        </div>
+        <div>
+          <span class="text-slate-500">Created</span>
+          <p id="drawerCreated" class="font-medium text-slate-400 mt-0.5">-</p>
+        </div>
+        <div>
+          <span class="text-slate-500">Updated</span>
+          <p id="drawerUpdated" class="font-medium text-slate-400 mt-0.5">-</p>
+        </div>
+      </div>
+
+      <div class="mt-2 flex flex-col gap-2">
+        <h3 class="text-slate-400 font-semibold tracking-wide uppercase text-[10px]">Technician Actions</h3>
+        <div class="grid grid-cols-2 gap-2">
+          <button onclick="openNoteModal('work_note')" class="flex items-center justify-center gap-1.5 py-2.5 px-3 bg-slate-800 hover:bg-slate-700 text-slate-100 rounded-xl font-semibold border border-slate-700 transition active:scale-95">
+            <span>✍️</span> Work Note
+          </button>
+          <button onclick="openNoteModal('comment')" class="flex items-center justify-center gap-1.5 py-2.5 px-3 bg-slate-800 hover:bg-slate-700 text-slate-100 rounded-xl font-semibold border border-slate-700 transition active:scale-95">
+            <span>💬</span> Comment
+          </button>
+          <button onclick="assignToMe()" id="btnAssignMe" class="flex items-center justify-center gap-1.5 py-2.5 px-3 bg-blue-600/90 hover:bg-blue-600 text-white rounded-xl font-semibold shadow-md shadow-blue-600/20 transition active:scale-95">
+            <span>👤</span> Assign to Me
+          </button>
+          <button onclick="openResolveModal()" class="flex items-center justify-center gap-1.5 py-2.5 px-3 bg-emerald-600/90 hover:bg-emerald-600 text-white rounded-xl font-semibold shadow-md shadow-emerald-600/20 transition active:scale-95">
+            <span>✅</span> Resolve Ticket
+          </button>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Modal: Note / Comment / Voice Input -->
+  <div id="noteModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md p-5 shadow-2xl flex flex-col gap-3">
+      <div class="flex items-center justify-between">
+        <h3 id="noteModalTitle" class="text-sm font-bold text-white">Add Work Note</h3>
+        <button onclick="closeNoteModal()" class="text-slate-400 hover:text-white">✕</button>
+      </div>
+      <p id="noteModalSub" class="text-xs text-slate-400">Internal work note for technician eyes only.</p>
+      
+      <div class="relative">
+        <textarea
+          id="noteInput"
+          rows="4"
+          placeholder="Type or tap mic to speak..."
+          class="w-full p-3 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-blue-500 transition"
+        ></textarea>
+        <button
+          type="button"
+          id="btnSpeechNote"
+          onclick="toggleSpeechRecognition('noteInput')"
+          title="Dictate via Voice"
+          class="absolute right-2.5 bottom-3.5 p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition active:scale-95"
+        >
+          🎙️
+        </button>
+      </div>
+
+      <div class="flex items-center justify-end gap-2 pt-1">
+        <button onclick="closeNoteModal()" class="px-3 py-2 rounded-lg bg-slate-800 text-slate-300 hover:text-white text-xs font-semibold">Cancel</button>
+        <button id="btnSubmitNote" onclick="submitNote()" class="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shadow-md shadow-blue-600/20 transition">
+          Submit Note
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Resolve Incident -->
+  <div id="resolveModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md p-5 shadow-2xl flex flex-col gap-3.5">
+      <div class="flex items-center justify-between">
+        <h3 class="text-sm font-bold text-emerald-400 flex items-center gap-1.5">
+          <span>✅</span> Resolve Incident
+        </h3>
+        <button onclick="closeResolveModal()" class="text-slate-400 hover:text-white">✕</button>
+      </div>
+
+      <div>
+        <label class="block text-xs font-medium text-slate-400 mb-1">Resolution Code</label>
+        <select id="resolveCodeSelect" class="w-full p-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-200 focus:outline-none focus:border-emerald-500">
+          <option value="Solution provided">Solution provided</option>
+          <option value="Workaround provided">Workaround provided</option>
+          <option value="User error">User error</option>
+          <option value="Hardware replaced">Hardware replaced</option>
+          <option value="Software patched">Software patched</option>
+          <option value="Not reproducible">Not reproducible</option>
+        </select>
+      </div>
+
+      <div>
+        <label class="block text-xs font-medium text-slate-400 mb-1">Resolution Notes</label>
+        <div class="relative">
+          <textarea
+            id="resolveNotesInput"
+            rows="3"
+            placeholder="Explain the root cause and how it was resolved..."
+            class="w-full p-3 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition"
+          ></textarea>
+          <button
+            type="button"
+            onclick="toggleSpeechRecognition('resolveNotesInput')"
+            title="Dictate via Voice"
+            class="absolute right-2.5 bottom-3.5 p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition active:scale-95"
+          >
+            🎙️
+          </button>
+        </div>
+      </div>
+
+      <div class="flex items-center justify-end gap-2 pt-1">
+        <button onclick="closeResolveModal()" class="px-3 py-2 rounded-lg bg-slate-800 text-slate-300 hover:text-white text-xs font-semibold">Cancel</button>
+        <button id="btnSubmitResolve" onclick="submitResolve()" class="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold shadow-md shadow-emerald-600/20 transition">
+          Confirm Resolution
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Create New Incident -->
+  <div id="createModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg p-5 shadow-2xl flex flex-col gap-3.5 max-h-[90vh] overflow-y-auto">
+      <div class="flex items-center justify-between">
+        <h3 class="text-sm font-bold text-blue-400 flex items-center gap-1.5">
+          <span>➕</span> Create New ServiceNow Incident
+        </h3>
+        <button onclick="closeCreateModal()" class="text-slate-400 hover:text-white">✕</button>
+      </div>
+
+      <div>
+        <label class="block text-xs font-medium text-slate-300 mb-1">Short Description *</label>
+        <div class="relative">
+          <input
+            type="text"
+            id="createShortDesc"
+            placeholder="e.g. VPN gateway unresponsive for APAC region"
+            class="w-full p-2.5 pr-10 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-blue-500"
+          />
+          <button
+            type="button"
+            onclick="toggleSpeechRecognition('createShortDesc')"
+            title="Dictate via Voice"
+            class="absolute right-2 top-2 p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs transition active:scale-95"
+          >
+            🎙️
+          </button>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-3 gap-2">
+        <div>
+          <label class="block text-xs font-medium text-slate-400 mb-1">Urgency</label>
+          <select id="createUrgency" class="w-full p-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-200 focus:outline-none focus:border-blue-500">
+            <option value="1">1 - High</option>
+            <option value="2">2 - Medium</option>
+            <option value="3" selected>3 - Low</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-slate-400 mb-1">Impact</label>
+          <select id="createImpact" class="w-full p-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-200 focus:outline-none focus:border-blue-500">
+            <option value="1">1 - High</option>
+            <option value="2">2 - Medium</option>
+            <option value="3" selected>3 - Low</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-slate-400 mb-1">Category</label>
+          <select id="createCategory" class="w-full p-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-200 focus:outline-none focus:border-blue-500">
+            <option value="Inquiry" selected>Inquiry</option>
+            <option value="Software">Software</option>
+            <option value="Hardware">Hardware</option>
+            <option value="Network">Network</option>
+            <option value="Database">Database</option>
+          </select>
+        </div>
+      </div>
+
+      <div>
+        <label class="block text-xs font-medium text-slate-300 mb-1">Detailed Description</label>
+        <div class="relative">
+          <textarea
+            id="createDescription"
+            rows="4"
+            placeholder="Provide complete context, error logs, and impact details..."
+            class="w-full p-3 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-blue-500 transition"
+          ></textarea>
+          <button
+            type="button"
+            onclick="toggleSpeechRecognition('createDescription')"
+            title="Dictate via Voice"
+            class="absolute right-2.5 bottom-3.5 p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition active:scale-95"
+          >
+            🎙️
+          </button>
+        </div>
+      </div>
+
+      <div class="flex items-center justify-end gap-2 pt-2">
+        <button onclick="closeCreateModal()" class="px-3 py-2 rounded-lg bg-slate-800 text-slate-300 hover:text-white text-xs font-semibold">Cancel</button>
+        <button id="btnSubmitCreate" onclick="submitCreateIncident()" class="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shadow-md shadow-blue-600/20 transition">
+          Submit Incident
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification Bar -->
+  <div id="toast" class="hidden fixed bottom-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700 shadow-2xl text-xs font-medium text-white flex items-center gap-2 transition-all duration-300">
+    <span id="toastIcon">🔔</span>
+    <span id="toastMsg">Notification</span>
+  </div>
+
+  <!-- Client-side JavaScript -->
+  <script>
+    const API_BASE = 'https://blcsjvifiytbznwesmyx.supabase.co/functions/v1/nowai-app';
+    const tg = window.Telegram?.WebApp;
+    if (tg) {
+      tg.ready();
+      tg.expand();
+    }
+
+    let allIncidents = [];
+    let currentFilter = 'triage';
+    let selectedIncident = null;
+    let currentUserId = null;
+    let recognition = null;
+    let isRecording = false;
+
+    function haptic(type) {
+      try {
+        if (tg?.HapticFeedback) {
+          if (type === 'success' || type === 'error' || type === 'warning') {
+            tg.HapticFeedback.notificationOccurred(type);
+          } else {
+            tg.HapticFeedback.impactOccurred(type || 'light');
+          }
+        }
+      } catch (_) {}
+    }
+
+    function showToast(msg, icon, type) {
+      const toast = document.getElementById('toast');
+      const toastMsg = document.getElementById('toastMsg');
+      const toastIcon = document.getElementById('toastIcon');
+      toastMsg.textContent = msg;
+      toastIcon.textContent = icon || '🔔';
+      toast.classList.remove('hidden');
+      haptic(type === 'error' ? 'error' : 'success');
+      setTimeout(() => toast.classList.add('hidden'), 3500);
+    }
+
+    window.addEventListener('DOMContentLoaded', async () => {
+      const tgUser = tg?.initDataUnsafe?.user;
+      if (tgUser) {
+        currentUserId = tgUser.id;
+        const nameDisplay = tgUser.first_name + (tgUser.last_name ? ' ' + tgUser.last_name : '');
+        document.getElementById('userName').textContent = nameDisplay;
+      } else {
+        const urlParams = new URLSearchParams(window.location.search);
+        currentUserId = urlParams.get('userId') || '40929622';
+      }
+
+      const urlParams = new URLSearchParams(window.location.search);
+      const deepLinkInc = urlParams.get('inc');
+
+      await Promise.all([fetchStats(), fetchIncidents()]);
+
+      if (deepLinkInc) {
+        setTimeout(() => openIncidentByNumber(deepLinkInc), 500);
+      }
+    });
+
+    async function fetchStats() {
+      try {
+        const url = API_BASE + '/api/stats' + (currentUserId ? '?userId=' + currentUserId : '');
+        const res = await fetch(url);
+        const data = await res.json();
+        if (data.ok && data.stats) {
+          document.getElementById('kpiCritical').textContent = data.stats.p1 + data.stats.p2;
+          document.getElementById('kpiTriage').textContent = data.stats.triage;
+          document.getElementById('kpiMy').textContent = data.stats.my;
+          document.getElementById('kpiTotal').textContent = data.stats.totalActive;
+        }
+      } catch (err) {
+        console.error('fetchStats error:', err);
+      }
+    }
+
+    async function fetchIncidents() {
+      const btn = document.getElementById('btnRefresh');
+      if (btn) btn.classList.add('animate-spin');
+
+      const container = document.getElementById('incidentListContainer');
+      container.innerHTML = 
+        '<div id="loadingState" class="py-12 flex flex-col items-center justify-center gap-3 text-slate-400">' +
+          '<div class="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>' +
+          '<p class="text-xs font-medium">Connecting to ServiceNow...</p>' +
+        '</div>';
+
+      try {
+        let apiUrl = API_BASE + '/api/incidents?filter=' + currentFilter;
+        if (currentUserId) apiUrl += '&userId=' + currentUserId;
+
+        const res = await fetch(apiUrl);
+        const data = await res.json();
+
+        if (!data.ok) throw new Error(data.error || 'Failed to load tickets');
+        allIncidents = data.incidents || [];
+        renderIncidentList(allIncidents);
+      } catch (err) {
+        container.innerHTML = 
+          '<div class="p-6 rounded-2xl bg-red-500/10 border border-red-500/20 text-center text-xs text-red-300">' +
+            '❌ ' + (err.message || 'Error loading ServiceNow tickets') + '<br/>' +
+            '<button onclick="fetchIncidents()" class="mt-3 px-3 py-1.5 rounded-lg bg-red-600 text-white font-semibold">Try Again</button>' +
+          '</div>';
+      } finally {
+        if (btn) btn.classList.remove('animate-spin');
+      }
+    }
+
+    function setFilter(filter) {
+      haptic('light');
+      currentFilter = filter;
+      document.querySelectorAll('.tab-btn').forEach(b => {
+        b.classList.remove('bg-blue-600', 'text-white', 'shadow-md');
+        b.classList.add('text-slate-400');
+      });
+      const activeTab = document.getElementById('tab-' + filter);
+      if (activeTab) {
+        activeTab.classList.add('bg-blue-600', 'text-white', 'shadow-md');
+        activeTab.classList.remove('text-slate-400');
+      }
+      fetchIncidents();
+    }
+
+    function getVal(v) {
+      if (v === null || v === undefined) return '';
+      if (typeof v === 'object') return v.display_value || v.value || '';
+      return String(v);
+    }
+
+    function getPriorityBadge(priorityRaw) {
+      const p = String(priorityRaw);
+      if (p.includes('1') || p === '1') {
+        return '<span class="px-2 py-0.5 rounded-md text-[11px] font-bold bg-red-500/15 text-red-400 border border-red-500/30">🚨 P1 - Critical</span>';
+      }
+      if (p.includes('2') || p === '2') {
+        return '<span class="px-2 py-0.5 rounded-md text-[11px] font-bold bg-orange-500/15 text-orange-400 border border-orange-500/30">🟠 P2 - High</span>';
+      }
+      if (p.includes('3') || p === '3') {
+        return '<span class="px-2 py-0.5 rounded-md text-[11px] font-semibold bg-yellow-500/15 text-yellow-400 border border-yellow-500/30">🟡 P3 - Moderate</span>';
+      }
+      return '<span class="px-2 py-0.5 rounded-md text-[11px] font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">🟢 P4 - Low</span>';
+    }
+
+    function getStateBadge(stateRaw) {
+      const s = String(stateRaw).toLowerCase();
+      if (s === '1' || s.includes('new')) {
+        return '<span class="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-blue-500/15 text-blue-400 border border-blue-500/30">⚡ New</span>';
+      }
+      if (s === '2' || s.includes('progress')) {
+        return '<span class="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-indigo-500/15 text-indigo-400 border border-indigo-500/30">🔄 In Progress</span>';
+      }
+      if (s === '3' || s.includes('hold')) {
+        return '<span class="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-amber-500/15 text-amber-400 border border-amber-500/30">⏳ On Hold</span>';
+      }
+      if (s === '6' || s.includes('resolve')) {
+        return '<span class="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">✅ Resolved</span>';
+      }
+      return '<span class="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-slate-500/15 text-slate-400 border border-slate-500/30">' + escapeHtml(stateRaw) + '</span>';
+    }
+
+    function renderIncidentList(list) {
+      const container = document.getElementById('incidentListContainer');
+      if (!list || list.length === 0) {
+        container.innerHTML = 
+          '<div class="py-16 flex flex-col items-center justify-center gap-2 text-center text-slate-500">' +
+            '<span class="text-4xl">🎉</span>' +
+            '<p class="text-sm font-semibold text-slate-400">No incidents in this view</p>' +
+            '<p class="text-xs text-slate-500">You are all caught up!</p>' +
+          '</div>';
+        return;
+      }
+
+      container.innerHTML = list.map((inc) => {
+        const number = getVal(inc.number);
+        const shortDesc = getVal(inc.short_description) || 'No summary provided';
+        const priority = getVal(inc.priority);
+        const state = getVal(inc.state);
+        const caller = getVal(inc.caller_id) || 'Unknown Caller';
+        const assigned = getVal(inc.assigned_to) || 'Unassigned';
+
+        return '<div ' +
+          'onclick="selectIncident(\'' + (inc.sys_id || inc.id) + '\')" ' +
+          'class="cursor-pointer p-4 rounded-2xl bg-slate-900/80 border border-slate-800 hover:border-slate-700/80 hover:bg-slate-850 shadow-sm transition active:scale-[0.99] flex flex-col gap-2.5">' +
+          '<div class="flex items-center justify-between gap-2">' +
+            '<div class="flex items-center gap-2">' +
+              '<span class="font-mono font-bold text-xs text-blue-400 tracking-wide">' + escapeHtml(number) + '</span>' +
+              getPriorityBadge(priority) +
+            '</div>' +
+            getStateBadge(state) +
+          '</div>' +
+          '<h2 class="text-sm font-semibold text-slate-100 leading-snug line-clamp-2">' + escapeHtml(shortDesc) + '</h2>' +
+          '<div class="flex items-center justify-between text-[11px] text-slate-400 pt-1 border-t border-slate-800/60">' +
+            '<span class="truncate max-w-[140px]">👤 ' + escapeHtml(caller) + '</span>' +
+            '<span class="truncate max-w-[150px] font-medium text-slate-300">' + (assigned === 'Unassigned' ? '⚠️ Unassigned' : '👨‍💻 ' + escapeHtml(assigned)) + '</span>' +
+          '</div>' +
+        '</div>';
+      }).join('');
+    }
+
+    function handleSearch() {
+      const q = document.getElementById('searchInput').value.trim().toLowerCase();
+      const clearBtn = document.getElementById('clearSearchBtn');
+      if (q) {
+        clearBtn.classList.remove('hidden');
+        const filtered = allIncidents.filter(inc => {
+          const num = getVal(inc.number).toLowerCase();
+          const desc = getVal(inc.short_description).toLowerCase();
+          const caller = getVal(inc.caller_id).toLowerCase();
+          const assignee = getVal(inc.assigned_to).toLowerCase();
+          return num.includes(q) || desc.includes(q) || caller.includes(q) || assignee.includes(q);
+        });
+        renderIncidentList(filtered);
+      } else {
+        clearBtn.classList.add('hidden');
+        renderIncidentList(allIncidents);
+      }
+    }
+
+    function clearSearch() {
+      document.getElementById('searchInput').value = '';
+      document.getElementById('clearSearchBtn').classList.add('hidden');
+      renderIncidentList(allIncidents);
+    }
+
+    async function selectIncident(sysId) {
+      haptic('light');
+      const inc = allIncidents.find(i => (i.sys_id === sysId || i.id === sysId));
+      if (!inc) return;
+
+      selectedIncident = inc;
+      populateDrawer(inc);
+      openDrawer();
+
+      try {
+        const res = await fetch(API_BASE + '/api/incident?id=' + (inc.number || sysId));
+        const data = await res.json();
+        if (data.ok && data.incident) {
+          selectedIncident = data.incident;
+          populateDrawer(data.incident);
+        }
+      } catch (_) {}
+    }
+
+    async function openIncidentByNumber(number) {
+      try {
+        const res = await fetch(API_BASE + '/api/incident?id=' + number);
+        const data = await res.json();
+        if (data.ok && data.incident) {
+          selectedIncident = data.incident;
+          populateDrawer(data.incident);
+          openDrawer();
+        }
+      } catch (_) {}
+    }
+
+    function populateDrawer(inc) {
+      const number = getVal(inc.number);
+      const shortDesc = getVal(inc.short_description);
+      const desc = getVal(inc.description);
+      const priority = getVal(inc.priority);
+      const state = getVal(inc.state);
+      const caller = getVal(inc.caller_id) || 'Not specified';
+      const cat = getVal(inc.category) || 'General';
+      const group = getVal(inc.assignment_group) || 'Unassigned';
+      const assignee = getVal(inc.assigned_to) || 'Unassigned';
+      const created = getVal(inc.sys_created_on) || '-';
+      const updated = getVal(inc.sys_updated_on) || '-';
+
+      document.getElementById('drawerIncNumber').textContent = number;
+      document.getElementById('drawerShortDesc').textContent = shortDesc;
+      document.getElementById('drawerDescription').textContent = desc || 'No detailed description provided.';
+      document.getElementById('drawerCaller').textContent = caller;
+      document.getElementById('drawerCategory').textContent = cat;
+      document.getElementById('drawerGroup').textContent = group;
+      document.getElementById('drawerAssignee').textContent = assignee;
+      document.getElementById('drawerCreated').textContent = created;
+      document.getElementById('drawerUpdated').textContent = updated;
+
+      document.getElementById('drawerPriorityBadge').innerHTML = getPriorityBadge(priority);
+      document.getElementById('drawerStateBadge').innerHTML = getStateBadge(state);
+    }
+
+    function openDrawer() {
+      document.getElementById('drawerBackdrop').classList.remove('hidden');
+      document.getElementById('incidentDrawer').classList.remove('translate-x-full');
+    }
+
+    function closeDrawer() {
+      haptic('light');
+      document.getElementById('drawerBackdrop').classList.add('hidden');
+      document.getElementById('incidentDrawer').classList.add('translate-x-full');
+    }
+
+    let currentNoteType = 'work_note';
+    function openNoteModal(type) {
+      haptic('light');
+      currentNoteType = type;
+      const title = type === 'work_note' ? 'Add Work Note' : 'Add Customer Comment';
+      const sub = type === 'work_note' ? 'Internal technician note (hidden from customer)' : 'Public update sent to customer';
+      document.getElementById('noteModalTitle').textContent = title;
+      document.getElementById('noteModalSub').textContent = sub;
+      document.getElementById('noteInput').value = '';
+      document.getElementById('noteModal').classList.remove('hidden');
+      document.getElementById('noteInput').focus();
+    }
+
+    function closeNoteModal() {
+      document.getElementById('noteModal').classList.add('hidden');
+    }
+
+    async function submitNote() {
+      const text = document.getElementById('noteInput').value.trim();
+      if (!text) return showToast('Please enter a note', '⚠️', 'warning');
+
+      const btn = document.getElementById('btnSubmitNote');
+      btn.disabled = true;
+      btn.textContent = 'Submitting...';
+
+      try {
+        const action = currentNoteType === 'work_note' ? 'add_work_note' : 'add_comment';
+        const payload = {
+          action: action,
+          sys_id: selectedIncident.sys_id || selectedIncident.id,
+          number: getVal(selectedIncident.number),
+          userId: currentUserId,
+          author: document.getElementById('userName').textContent,
+          [currentNoteType === 'work_note' ? 'note' : 'comment']: text,
+        };
+
+        const res = await fetch(API_BASE + '/api/action', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        const data = await res.json();
+        if (!data.ok) throw new Error(data.error || 'Action failed');
+
+        closeNoteModal();
+        showToast(currentNoteType === 'work_note' ? 'Work note added!' : 'Customer comment added!', '✅', 'success');
+        fetchStats();
+      } catch (err) {
+        showToast(err.message, '❌', 'error');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Submit Note';
+      }
+    }
+
+    async function assignToMe() {
+      haptic('medium');
+      const btn = document.getElementById('btnAssignMe');
+      btn.disabled = true;
+      btn.textContent = 'Assigning...';
+
+      try {
+        const payload = {
+          action: 'assign',
+          sys_id: selectedIncident.sys_id || selectedIncident.id,
+          number: getVal(selectedIncident.number),
+          userId: currentUserId,
+          assign_to: 'me',
+        };
+
+        const res = await fetch(API_BASE + '/api/action', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        const data = await res.json();
+        if (!data.ok) throw new Error(data.error || 'Assignment failed');
+
+        showToast('Ticket assigned to you!', '👤', 'success');
+        document.getElementById('drawerAssignee').textContent = document.getElementById('userName').textContent;
+        fetchIncidents();
+        fetchStats();
+      } catch (err) {
+        showToast(err.message, '❌', 'error');
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<span>👤</span> Assign to Me';
+      }
+    }
+
+    function openResolveModal() {
+      haptic('light');
+      document.getElementById('resolveNotesInput').value = '';
+      document.getElementById('resolveModal').classList.remove('hidden');
+    }
+
+    function closeResolveModal() {
+      document.getElementById('resolveModal').classList.add('hidden');
+    }
+
+    async function submitResolve() {
+      const notes = document.getElementById('resolveNotesInput').value.trim();
+      if (!notes) return showToast('Please enter resolution notes', '⚠️', 'warning');
+      const code = document.getElementById('resolveCodeSelect').value;
+
+      const btn = document.getElementById('btnSubmitResolve');
+      btn.disabled = true;
+      btn.textContent = 'Resolving...';
+
+      try {
+        const payload = {
+          action: 'resolve',
+          sys_id: selectedIncident.sys_id || selectedIncident.id,
+          number: getVal(selectedIncident.number),
+          userId: currentUserId,
+          author: document.getElementById('userName').textContent,
+          resolution_code: code,
+          resolution_notes: notes,
+        };
+
+        const res = await fetch(API_BASE + '/api/action', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        const data = await res.json();
+        if (!data.ok) throw new Error(data.error || 'Resolution failed');
+
+        closeResolveModal();
+        closeDrawer();
+        showToast('Incident resolved!', '🎉', 'success');
+        fetchIncidents();
+        fetchStats();
+      } catch (err) {
+        showToast(err.message, '❌', 'error');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Confirm Resolution';
+      }
+    }
+
+    function openCreateModal() {
+      haptic('light');
+      document.getElementById('createShortDesc').value = '';
+      document.getElementById('createDescription').value = '';
+      document.getElementById('createModal').classList.remove('hidden');
+    }
+
+    function closeCreateModal() {
+      document.getElementById('createModal').classList.add('hidden');
+    }
+
+    async function submitCreateIncident() {
+      const shortDesc = document.getElementById('createShortDesc').value.trim();
+      if (!shortDesc) return showToast('Please provide a short description', '⚠️', 'warning');
+
+      const desc = document.getElementById('createDescription').value.trim();
+      const urgency = document.getElementById('createUrgency').value;
+      const impact = document.getElementById('createImpact').value;
+      const category = document.getElementById('createCategory').value;
+
+      const btn = document.getElementById('btnSubmitCreate');
+      btn.disabled = true;
+      btn.textContent = 'Submitting to ServiceNow...';
+
+      try {
+        const payload = {
+          action: 'create_incident',
+          short_description: shortDesc,
+          description: desc,
+          urgency,
+          impact,
+          category,
+          userId: currentUserId,
+        };
+
+        const res = await fetch(API_BASE + '/api/action', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        const data = await res.json();
+        if (!data.ok) throw new Error(data.error || 'Failed to create incident');
+
+        const createdNumber = data.result?.number || data.result?.record?.number || 'Incident';
+        closeCreateModal();
+        showToast('Created ' + createdNumber + ' successfully!', '🎉', 'success');
+        setFilter('all');
+        fetchStats();
+      } catch (err) {
+        showToast(err.message, '❌', 'error');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Submit Incident';
+      }
+    }
+
+    function toggleSpeechRecognition(targetInputId) {
+      haptic('medium');
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SpeechRecognition) {
+        showToast('Voice dictation not supported on this browser', '⚠️', 'warning');
+        return;
+      }
+
+      if (isRecording) {
+        recognition.stop();
+        isRecording = false;
+        showToast('Voice dictation stopped', '🎙️');
+        return;
+      }
+
+      recognition = new SpeechRecognition();
+      recognition.continuous = false;
+      recognition.interimResults = false;
+      recognition.lang = 'en-US';
+
+      recognition.onstart = () => {
+        isRecording = true;
+        showToast('Listening... Speak your notes now', '🔴');
+      };
+
+      recognition.onresult = (event) => {
+        const transcript = event.results[0][0].transcript;
+        const target = document.getElementById(targetInputId);
+        if (target) {
+          target.value = (target.value ? target.value + ' ' : '') + transcript;
+        }
+        showToast('Transcribed: "' + transcript + '"', '🎙️');
+      };
+
+      recognition.onerror = (event) => {
+        console.error('Speech recognition error:', event.error);
+        showToast('Mic error: ' + event.error, '❌', 'error');
+        isRecording = false;
+      };
+
+      recognition.onend = () => {
+        isRecording = false;
+      };
+
+      recognition.start();
+    }
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+  </script>
+</body>
+</html>
